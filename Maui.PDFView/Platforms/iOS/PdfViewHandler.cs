@@ -16,6 +16,7 @@ namespace Maui.PDFView.Platforms.iOS
         };
 
         private string _fileName;
+        private NSObject? _pageChangedObserver;
 
         public PdfViewHandler() : base(PropertyMapper, null)
         {
@@ -45,7 +46,7 @@ namespace Maui.PDFView.Platforms.iOS
             var pdfView = new PdfKit.PdfView();
 
             // Subscribe to notification of page changes
-            NSNotificationCenter.DefaultCenter.AddObserver(
+            _pageChangedObserver = NSNotificationCenter.DefaultCenter.AddObserver(
                 PdfKit.PdfView.PageChangedNotification, 
                 PageChangedNotificationHandler, 
                 pdfView);
@@ -61,8 +62,10 @@ namespace Maui.PDFView.Platforms.iOS
 
         void RenderPages()
         {
-            if (_fileName == null)
+            if (string.IsNullOrEmpty(_fileName) || PlatformView == null)
                 return;
+
+            PlatformView.Document?.Dispose();
 
             PlatformView.Document = new PdfDocument(NSData.FromFile(_fileName));
 
@@ -96,7 +99,18 @@ namespace Maui.PDFView.Platforms.iOS
 
         protected override void DisconnectHandler(PdfKit.PdfView platformView)
         {
-            NSNotificationCenter.DefaultCenter.RemoveObserver(PlatformView);
+            if (_pageChangedObserver != null)
+            {
+                NSNotificationCenter.DefaultCenter.RemoveObserver(_pageChangedObserver);
+                _pageChangedObserver.Dispose();
+                _pageChangedObserver = null;
+            }
+
+            if (platformView != null)
+            {
+                platformView.Document?.Dispose();
+                platformView.Dispose();
+            }
             base.DisconnectHandler(platformView);
         }
     }
